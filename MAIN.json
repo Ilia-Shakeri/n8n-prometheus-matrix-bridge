@@ -1,0 +1,1114 @@
+{
+  "name": "Prometheus Alerts to Matrix",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://YOUR_MATRIX_SERVER/_matrix/client/v3/login",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"type\": \"m.login.password\",\n  \"user\": \"YOUR_USERNAME\",\n  \"password\": \"YOUR_PASSWORD\"\n}",
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1952,
+        944
+      ],
+      "id": "43f57418-db1b-4074-ae15-39e03d107c46",
+      "name": "Login and get access token",
+      "alwaysOutputData": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": 10
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2720,
+        1104
+      ],
+      "id": "7c8fcb8c-5480-426d-b719-be2e6cf47301",
+      "name": "Wait",
+      "webhookId": "9ebd3b28-31d8-40f6-b826-4a099775e0c9"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Login Retry Handler\n * Simplifies the login retry logic into one place.\n * Handles: success, retry (up to maxRetries), failure.\n */\n\nconst out = [];\nfor (const item of items) {\n  const sc = Number(item.json.statusCode || 0);\n  const retryCount = Number(item.json.retryCount || 0);\n  const maxRetries = 3;\n\n  // ✅ Success\n  if (sc === 200 && item.json.body?.access_token) {\n    item.json.result = 'ok';\n    out.push(item);\n    continue;\n  }\n\n  // ⏳ Retry on 429, 5xx, or network issues\n  if ((sc === 429 || sc >= 500 || sc === 0) && retryCount < maxRetries) {\n    const waitMs = 1000 * Math.pow(2, retryCount) + Math.floor(Math.random() * 500); // exponential backoff + jitter\n    item.json.result = 'retry';\n    item.json.waitMs = waitMs;\n    item.json.retryCount = retryCount + 1;\n    out.push(item);\n    continue;\n  }\n\n  // ❌ Hard failure (bad credentials or exhausted retries)\n  item.json.result = 'fail';\n  item.json.errorReason = sc !== 200 ? `Login failed (status ${sc})` : 'No token in response';\n  out.push(item);\n}\n\nreturn out;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2128,
+        944
+      ],
+      "id": "1d12f06f-f11f-4d2e-92f8-50720908f9a5",
+      "name": "Login Retry Handler"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ycFbvrpFBrU97KAc",
+          "mode": "list",
+          "cachedResultName": "PrometheusAccessToken",
+          "cachedResultUrl": "/projects/AmDelcKINuc4Fqth/datatables/ycFbvrpFBrU97KAc"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "user_id",
+              "condition": "ilike",
+              "keyValue": "={{ '@prometheus:YOUR_MATRIX_SERVER' }}"
+            }
+          ]
+        },
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        288,
+        656
+      ],
+      "id": "5b9aee75-dac9-40c6-9c68-43e8c8a67f53",
+      "name": "Get Stored Access Token",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2f1f6db9-26d6-48ec-9cab-dca913a7fec2",
+              "leftValue": "={{ $json.access_token }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        496,
+        656
+      ],
+      "id": "cf580cce-bcac-4615-b39e-044d3d1f8dd2",
+      "name": "Has Stored Token?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "74f71f3e-c720-4105-8685-389a35c4d8ce",
+              "name": "access_token",
+              "value": "={{ $json.access_token }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        864,
+        512
+      ],
+      "id": "4d639c1b-4710-4e96-9446-faea5ea61318",
+      "name": "Set Stored Token"
+    },
+    {
+      "parameters": {},
+      "id": "fa29ddcc-d46d-4fac-b413-aecef4aaf8b4",
+      "name": "❌Dropped (User Not Exist)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        2720,
+        944
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://YOUR_MATRIX_SERVER/_matrix/client/v3/account/whoami\n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1024,
+        608
+      ],
+      "id": "8d4808cd-0fe6-439b-add8-08a439c1b6d7",
+      "name": "Test Stored Token",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const out = [];\n\nfor (const item of items) {\n  // Process only items that have a valid statusCode\n  if (!('statusCode' in item.json)) continue;\n\n  const sc = Number(item.json.statusCode || 0);\n  console.log(`Token test: status=${sc}`);\n\n  if (sc === 200) {\n    item.json.result = \"ok\";\n  } else if (sc === 401 && item.json.body?.errcode === \"M_UNKNOWN_TOKEN\") {\n    item.json.result = \"invalid\";\n  } else {\n    item.json.result = \"fail\";\n    item.json.errorReason = `Unexpected response: status=${sc}`;\n  }\n\n  out.push(item);\n}\n\n// If no HTTP item found, return one fail for safety\nreturn out.length ? out : [{ json: { result: \"fail\", reason: \"No HTTP response\" } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1472,
+        624
+      ],
+      "id": "0555ef20-084c-42bc-9bc0-66a809ae0333",
+      "name": "Check Token Validity"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cdfc2306-087c-463a-9f01-5050b8a65aca",
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "fail",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fail"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "ok",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7b30d94b-6eac-4700-8189-13c5b91016c8"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ok"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "025b1785-de1b-419a-b789-83b51c6a1434",
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "invalid",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "invalid"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1680,
+        608
+      ],
+      "id": "9759f74a-ed13-4fc3-b5a2-53ed3b4da99c",
+      "name": "Handle Token Result"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "ok",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "7b30d94b-6eac-4700-8189-13c5b91016c8"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ok"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "025b1785-de1b-419a-b789-83b51c6a1434",
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "fail",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "fail"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cdfc2306-087c-463a-9f01-5050b8a65aca",
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "retry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "retry"
+            }
+          ]
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        2304,
+        928
+      ],
+      "id": "2f7722eb-7088-4684-86c0-45cb1a6147e6",
+      "name": "Handle Login Result"
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "ycFbvrpFBrU97KAc",
+          "mode": "list",
+          "cachedResultName": "PrometheusAccessToken",
+          "cachedResultUrl": "/projects/AmDelcKINuc4Fqth/datatables/ycFbvrpFBrU97KAc"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "user_id",
+              "condition": "ilike",
+              "keyValue": "={{ $json.body.user_id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_id": "={{ '@prometheus:YOUR_MATRIX_SERVER' }}",
+            "access_token": "={{ $json.body.access_token }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "access_token",
+              "displayName": "access_token",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [
+        2720,
+        800
+      ],
+      "id": "907e088a-8ff0-49e0-be89-da8b0c9cb213",
+      "name": "Store New Access Token"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1200,
+        528
+      ],
+      "id": "13d79f95-7ad2-460a-8a7f-741627905b08",
+      "name": "Merge DATA"
+    },
+    {
+      "parameters": {
+        "numberInputs": 4
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        2784,
+        528
+      ],
+      "id": "a4f71330-fab6-44b4-8c2c-64bbe996772f",
+      "name": "Merge access token DATA"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "prometheus-alerts",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        48,
+        400
+      ],
+      "id": "4b6b1a2a-4d32-431a-915d-c8c959ee6368",
+      "name": "Webhook",
+      "webhookId": "040a15c9-c0b5-46cd-aca9-261b8bbb8116"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Unified HTTP response handler for Matrix/Jira requests\n * Handles success, rate-limit, server error, and fatal errors in one node.\n * \n * Expected input: each item has { statusCode, body, headers?, retryCount?, maxRetries? }\n * Returns:\n *   - on success → same item, with `result: \"ok\"`\n *   - on retry → same item, with `result: \"retry\"`, `waitMs` set (ms to sleep)\n *   - on fatal → same item, with `result: \"drop\"`\n */\n\nconst out = [];\n\nfor (const item of items) {\n  const sc = Number(item.json.statusCode || 0);\n  const retryCount = Number(item.json.retryCount || 0);\n  const maxRetries = Number(item.json.maxRetries || 3);\n\n  // Log input for debugging\n  console.log(`Processing item: ${JSON.stringify(item.json)}`);\n\n  // Check for Matrix success (event_id present, even if statusCode missing)\n  if (([200, 201, 202].includes(sc) || item.json.event_id) && !item.json.body?.error) {\n    // ✅ Success (HTTP 200/201/202 or event_id indicates Matrix send success)\n    item.json.result = \"ok\";\n    out.push(item);\n    continue;\n  }\n\n  if (sc === 429 || sc >= 500) {\n    // ⏳ Retryable error\n    if (retryCount < maxRetries) {\n      const base = sc === 429 ? 1000 : 2000;             // base wait\n      const jitter = Math.floor(Math.random() * base);   // add randomness\n      item.json.waitMs = base + jitter;\n      item.json.retryCount = retryCount + 1;\n      item.json.result = \"retry\";\n      out.push(item);\n      continue;\n    }\n  }\n\n  // ❌ Fatal / too many retries / other errors\n  item.json.result = \"drop\";\n  out.push(item);\n}\n\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3936,
+        560
+      ],
+      "id": "8e77ee2c-b60e-4a89-b0c6-10292688adfa",
+      "name": "Check HTTP Result and Retry4"
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        4352,
+        720
+      ],
+      "id": "71b3d2e0-aea0-4350-99d3-74df1bbc5de5",
+      "name": "Wait5",
+      "webhookId": "7c83d998-e1dc-4f95-9dfc-170ff2ee10b5"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4352,
+        416
+      ],
+      "id": "4b6f1d77-b698-49e9-aaee-0fa31ca9c24e",
+      "name": "✅ Message Sent (End)"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "ok",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "37e16076-bd4c-440c-b196-f670891ccd17"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "ok"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a0a2b018-ea9e-4801-b60c-6821f01d835c",
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "drop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "drop"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "dd8579d7-0ad2-43aa-ba2d-dba35d49aff3",
+                    "leftValue": "={{ $json.result }}",
+                    "rightValue": "retry",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "retry"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        4128,
+        544
+      ],
+      "id": "2863fe10-d529-48f2-be88-f1db2c935530",
+      "name": "Handle Send Result",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        4352,
+        560
+      ],
+      "id": "f401982f-d021-4bb2-b768-b27201c0d378",
+      "name": "❌Dropped (Send Failed)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Find the alert payload (Webhook Data)\nconst alertItem = items.find(i => \n  (i.json.alerts && Array.isArray(i.json.alerts)) || \n  (i.json.body && i.json.body.alerts && Array.isArray(i.json.body.alerts))\n);\n\n// 2. Find the Access Token payload (Database Data)\n// We specifically look for an item that has the 'access_token' field\nconst tokenItem = items.find(i => i.json.access_token);\n\n// Safety Check\nif (!alertItem) {\n  return [{ json: { formatted_message: \"⚠️ <b>Error:</b> No alert data found.\", access_token: null } }];\n}\n\n// Normalize the payload\nconst payload = alertItem.json.body ? alertItem.json.body : alertItem.json;\nconst alerts = payload.alerts || [];\nconst globalStatus = payload.status || 'unknown';\n\n// 3. Define Styles\nconst isFiring = globalStatus === 'firing';\nconst headerColor = isFiring ? '#ff5252' : '#4caf50'; \nconst headerIcon = isFiring ? '🔥' : '✅';\nconst statusTitle = isFiring ? 'FIRING' : 'RESOLVED';\n\n// 4. Build HTML\nlet html = `<h3><font color=\"${headerColor}\">${headerIcon} <b>${statusTitle}: ${alerts.length} Alert(s)</b></font></h3>`;\n\nfor (const alert of alerts) {\n  const lbl = alert.labels || {};\n  const ann = alert.annotations || {};\n  \n  const timeStr = alert.startsAt ? new Date(alert.startsAt).toISOString().replace('T', ' ').substring(0, 19) + ' UTC' : 'N/A';\n  const alertName = lbl.alertname || 'Unknown Alert';\n  const container = lbl.container || lbl.container_name || 'N/A';\n  const instance = lbl.instance || 'N/A';\n  const severity = lbl.severity ? lbl.severity.toUpperCase() : 'UNKNOWN';\n  const description = ann.description || ann.summary || 'No details.';\n  const generatorUrl = alert.generatorURL || '#';\n\n  html += `<hr>`;\n  html += `<strong>🚨 Issue:</strong> ${alertName} <small>(${severity})</small><br>`;\n  \n  if (container !== 'N/A') {\n    html += `<strong>📦 Container:</strong> <code>${container}</code><br>`;\n  }\n  \n  html += `<strong>🖥️ Host/VM:</strong> <code>${instance}</code><br>`;\n  html += `<strong>🕒 Time:</strong> ${timeStr}<br>`;\n  html += `<strong>📝 Details:</strong> <i>${description}</i><br>`;\n  html += `<br><a href=\"${generatorUrl}\">🔍 Analyze in Prometheus</a>`;\n}\n\n// 5. Return Logic (The Fix)\n// We extract the token from the 'tokenItem' we found earlier\nconst finalToken = tokenItem ? tokenItem.json.access_token : null;\n\nreturn [{\n  json: {\n    formatted_message: html,\n    access_token: finalToken\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3072,
+        560
+      ],
+      "id": "3d0e96a0-7c23-4bdc-9c95-2420b20daed8",
+      "name": "Format Prometheus Message"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "29a904f7-b2bd-4948-ac61-a8aac009f889",
+              "name": "room_id",
+              "value": "!YOUR_ROOM_ID:YOUR_SERVER",
+              "type": "string"
+            },
+            {
+              "id": "eaf6fd61-04b1-4aea-8fa4-e503e5d7b680",
+              "name": "formatted_message",
+              "value": "={{ $json.formatted_message }}",
+              "type": "string"
+            },
+            {
+              "id": "0e6d6419-dfd0-48d4-a425-2d7abb083ef7",
+              "name": "access_token",
+              "value": "={{ $json.access_token }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3376,
+        560
+      ],
+      "id": "38a63386-d9eb-4c29-ba71-c2c1fb4734c6",
+      "name": "Set Config"
+    },
+    {
+      "parameters": {
+        "requestMethod": "PUT",
+        "url": "=https://YOUR_MATRIX_SERVER/_matrix/client/v3/rooms/{{ $json.room_id }}/send/m.room.message/{{ $now }}",
+        "options": {
+          "fullResponse": true
+        },
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "msgtype",
+              "value": "m.text"
+            },
+            {
+              "name": "body",
+              "value": "=Prometheus Alert"
+            },
+            {
+              "name": "format",
+              "value": "org.matrix.custom.html"
+            },
+            {
+              "name": "formatted_body",
+              "value": "={{ $json.formatted_message }}"
+            }
+          ]
+        },
+        "headerParametersUi": {
+          "parameter": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $json.access_token }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "497a6419-85f8-43cb-afd5-44d96c76662a",
+      "name": "Send Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        3744,
+        560
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "content": "# 🚀 Prometheus to Matrix: Enterprise Alert Bridge\n\n## This workflow acts as a resilient bridge between **Prometheus Alertmanager** and **Matrix Chat**.\n## Unlike simple integrations, this system features intelligent state management and error handling.\n\n## ✨ Key Features:\n### * **🔐 Smart Authentication:** Implements a \"Check-Verify-Renew\" logic. It caches access tokens in a database to prevent login spam, validates them before use, and automatically rotates them if expired.\n### * **🎨 Rich HTML Formatting:** parses raw Prometheus JSON payloads into clean, readable HTML alerts with color-coded headers (Firing/Resolved).\n### * **🛡️ Reliability First:** Includes exponential backoff and retry logic for both the Login process and the Message Delivery system to handle network blips or Matrix server rate limits (HTTP 429).\n\n---\n**👨‍💻 Author:** Ilia Shakeri\n**🔗 GitHub:** https://github.com/ilia-shakeri",
+        "height": 464,
+        "width": 1296,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        2320,
+        -528
+      ],
+      "id": "1c111ff9-8f56-41ef-afbe-a20bb6ee4192",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# 🔐 Smart Authentication & Token Rotation\n\n## This section handles the security lifecycle:\n## 1.  **Cache Lookup:** Checks the local database for an existing Access Token.\n## 2.  **Health Check:** Validates the token against the Matrix API (`whoami`).\n## 3.  **Auto-Recovery:** If the token is missing or invalid (401), it triggers the **Login Flow** to acquire a new one.\n## 4.  **Storage:** Automatically updates the database with the fresh token for future runs.\n\n### *Status: Self-Healing Auth Implemented ✅*",
+        "height": 1328,
+        "width": 2928,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        16,
+        -16
+      ],
+      "id": "8f1c1396-0535-4507-9aab-5318eccd8a67",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "# ✉️ Payload Processing & Reliable Delivery\n\n## This section transforms raw data into actionable insights:\n## 1.  **Ingestion:** Receives the `firing` or `resolved` payload from Alertmanager.\n## 2.  **Formatting:** Uses Javascript to parse labels/annotations and generates a beautiful HTML message (including direct links to Prometheus graphs).\n## 3.  **Delivery:** Sends the message to the specific Matrix Room ID.\n## 4.  **Resilience:** Includes a `Retry Handler` that detects HTTP 5xx/429 errors and retries delivery with jittered backoff.\n\n### *Status: Rich Formatting & Retry Logic Active ✅*",
+        "height": 1328,
+        "width": 1616,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        3024,
+        -16
+      ],
+      "id": "0c743b42-a936-4652-89c3-03f475067e49",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "receiver": "n8n-webhook",
+          "status": "firing",
+          "alerts": [
+            {
+              "status": "firing",
+              "labels": {
+                "alertname": "HighMemoryUsage",
+                "container": "jira",
+                "instance": "192.168.0.101:8081",
+                "job": "cadvisor",
+                "severity": "warning",
+                "name": "jira"
+              },
+              "annotations": {
+                "description": "Container jira is using over 80% RAM. VALUE = 85.432",
+                "summary": "Container High Memory usage (jira)"
+              },
+              "startsAt": "2025-12-06T08:30:00.000Z",
+              "endsAt": "0001-01-01T00:00:00Z",
+              "generatorURL": "http://YOUR_PROMETHEUS_SERVER/graph?g0.expr=..."
+            }
+          ],
+          "groupLabels": {
+            "alertname": "HighMemoryUsage"
+          },
+          "commonLabels": {
+            "alertname": "HighMemoryUsage",
+            "severity": "warning"
+          },
+          "commonAnnotations": {
+            "summary": "Container High Memory usage (jira)"
+          },
+          "externalURL": "http://alertmanager.YOUR_SERVER",
+          "version": "4",
+          "groupKey": "{}:{alertname=\"HighMemoryUsage\"}"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Login and get access token": {
+      "main": [
+        [
+          {
+            "node": "Login Retry Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Login and get access token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Login Retry Handler": {
+      "main": [
+        [
+          {
+            "node": "Handle Login Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Stored Access Token": {
+      "main": [
+        [
+          {
+            "node": "Has Stored Token?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Stored Token?": {
+      "main": [
+        [
+          {
+            "node": "Set Stored Token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Login and get access token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Stored Token": {
+      "main": [
+        [
+          {
+            "node": "Test Stored Token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge DATA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Test Stored Token": {
+      "main": [
+        [
+          {
+            "node": "Merge DATA",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Check Token Validity": {
+      "main": [
+        [
+          {
+            "node": "Handle Token Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Token Result": {
+      "main": [
+        [
+          {
+            "node": "Login and get access token",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Merge access token DATA",
+            "type": "main",
+            "index": 2
+          }
+        ],
+        [
+          {
+            "node": "Login and get access token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Login Result": {
+      "main": [
+        [
+          {
+            "node": "Store New Access Token",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge access token DATA",
+            "type": "main",
+            "index": 3
+          }
+        ],
+        [
+          {
+            "node": "❌Dropped (User Not Exist)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge DATA": {
+      "main": [
+        [
+          {
+            "node": "Check Token Validity",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge access token DATA",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Merge access token DATA",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get Stored Access Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check HTTP Result and Retry4": {
+      "main": [
+        [
+          {
+            "node": "Handle Send Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait5": {
+      "main": [
+        [
+          {
+            "node": "Send Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Send Result": {
+      "main": [
+        [
+          {
+            "node": "✅ Message Sent (End)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "❌Dropped (Send Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge access token DATA": {
+      "main": [
+        [
+          {
+            "node": "Format Prometheus Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Prometheus Message": {
+      "main": [
+        [
+          {
+            "node": "Set Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Alert": {
+      "main": [
+        [
+          {
+            "node": "Check HTTP Result and Retry4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Config": {
+      "main": [
+        [
+          {
+            "node": "Send Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2ae831b1-a356-43e5-8e36-e6581d1b3ea0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d75811a97b26dfebf7cde6e1d517450a54868e8c671d97d2630abe25bcb42a8a"
+  },
+  "id": "E9OyNQTmFMg90HeJ",
+  "tags": []
+}
