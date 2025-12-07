@@ -12,7 +12,22 @@
 ## 📖 Overview
 
 Standard webhooks often fail silently when tokens expire or networks hiccup. This workflow is designed with **DevOps reliability principles** in mind. It acts as a middleware between Alertmanager and Matrix, ensuring that critical infrastructure alerts are delivered, formatted beautifully, and securely authenticated.
+### 🏗️ Architecture
 
+```mermaid
+graph LR
+    A[Prometheus] -- Fires Alert --> B[Alertmanager]
+    B -- Webhook JSON --> C(n8n Webhook Node)
+    subgraph "n8n Workflow"
+    C --> D{Auth Handler}
+    D -- Auto-Rotate Token --> E[Format & HTML]
+    E --> F[Retry Logic]
+    end
+    F -- Send Message --> G[Matrix Chat Room]
+    
+    style C fill:#ff6d5a,stroke:#333,stroke-width:2px,color:white
+    style G fill:#000000,stroke:#333,stroke-width:2px,color:white
+```
 ### ✨ Key Features
 
 * **🔐 Smart Authentication:** Implements a "Check-Verify-Renew" cycle. It caches access tokens in an internal database to prevent login spam, validates them before use (`whoami`), and automatically rotates them if expired (Self-Healing).
@@ -76,13 +91,18 @@ receivers:
 ```
 ---
 ## 📸 Screenshots
+<div align="center">
 <img width="1677" height="670" alt="Screenshot 2025-12-07 121731" src="https://github.com/user-attachments/assets/f7caa36f-0f94-4267-9051-1d1fc1a3b0c5" />
 <img width="502" height="248" alt="Screenshot 2025-12-07 121638" src="https://github.com/user-attachments/assets/21e23d47-435c-4bd2-94cc-5004ff839a55" />
+</div>
 
+---
 
+<div align="center">
 👨‍💻 Author
 Ilia Shakeri
 
 DevOps Engineer & Automation Enthusiast
 
 Made with ❤️ using n8n
+</div>
