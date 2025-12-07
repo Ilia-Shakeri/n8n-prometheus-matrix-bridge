@@ -2,8 +2,8 @@
 
 ![n8n](https://img.shields.io/badge/n8n-workflow-ff6c37?style=flat-square&logo=n8n)
 ![Prometheus](https://img.shields.io/badge/Prometheus-Alertmanager-e6522c?style=flat-square&logo=prometheus)
-![Matrix](https://img.shields.io/badge/Matrix-Protocol-000000?style=flat-square&logo=matrix)
-![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)
+![Matrix](https://img.shields.io/badge/Matrix-000000?style=flat-square&logo=matrix)
+![License](https://img.shields.io/badge/license-CC0-blue?style=flat-square)
 
 > A resilient, self-healing integration that formats **Prometheus Alertmanager** payloads into rich HTML messages and delivers them to **Matrix/Element** chat rooms.
 
@@ -73,24 +73,16 @@ receivers:
   webhook_configs:
   - url: '[https://n8n.yourdomain.com/webhook/prometheus-alerts](https://n8n.yourdomain.com/webhook/prometheus-alerts)'
     send_resolved: true
-📸 Screenshots
-(Add a screenshot of your n8n workflow canvas here) (Add a screenshot of a "Firing" alert in Element/Matrix here)
+```
+---
+## 📸 Screenshots
+<img width="1677" height="670" alt="Screenshot 2025-12-07 121731" src="https://github.com/user-attachments/assets/f7caa36f-0f94-4267-9051-1d1fc1a3b0c5" />
+<img width="502" height="248" alt="Screenshot 2025-12-07 121638" src="https://github.com/user-attachments/assets/21e23d47-435c-4bd2-94cc-5004ff839a55" />
+
 
 👨‍💻 Author
 Ilia Shakeri
 
 DevOps Engineer & Automation Enthusiast
 
-GitHub Profile
-
 Made with ❤️ using n8n
-
-
----
-
-### 💡 Mentoring Notes for You
-
-1.  **Screenshots:** Before you push, take a screenshot of the workflow (the sticky notes make it look awesome) and a screenshot of a test alert in your Element app. Place them in the repo and link them in the README. It increases engagement by 100%.
-2.  **The `.env` question:** If you want to use `.env` files in your own *private* environment, you can. You would use expressions like `{{ $env.MATRIX_PASSWORD }}` inside the nodes. However, for a **public GitHub template**, the method above (Clean JSON + Instructions) is standard practice because we don't know how other people configure their n8n environment variables.
-
-**Would you like me to generate a sanitized version of the JSON code for you right now so you can just copy-paste it into a file?**
